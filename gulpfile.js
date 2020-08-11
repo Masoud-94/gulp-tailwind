@@ -2,6 +2,8 @@ const gulp = require("gulp");
 const sass = require("gulp-sass");
 const browserSync = require("browser-sync").create();
 const postcss = require("gulp-postcss");
+const options = require("./package.json").options;
+var tailwindcss = require("tailwindcss");
 
 //compile scss to css
 function style() {
@@ -15,7 +17,9 @@ function style() {
 function css() {
   return gulp
     .src("./scss/tailwind.css")
-    .pipe(postcss([require("tailwindcss"), require("autoprefixer")]))
+    .pipe(
+      postcss([tailwindcss(options.config.tailwindjs), require("autoprefixer")])
+    )
     .pipe(gulp.dest("./css"));
 }
 
@@ -30,5 +34,5 @@ function watch() {
   gulp.watch("./scss/**/*.js").on("change", browserSync.reload);
 }
 
-exports.style = gulp.series([style, css]);
+exports.build = gulp.series([style, css]);
 exports.watch = watch;
