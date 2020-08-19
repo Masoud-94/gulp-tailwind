@@ -32,7 +32,8 @@ function styles() {
   return (mergedStream = merge(sassStream, cssStream, tailwindStream)
     .pipe(concat("styles.css"))
     .pipe(cleanCSS({ compatibility: "ie8" }))
-    .pipe(gulp.dest("./dist/")));
+    .pipe(gulp.dest("./dist/"))
+    .pipe(browserSync.reload({ stream: true })));
 }
 
 //compiling our Javascripts
@@ -40,7 +41,7 @@ function scripts() {
   //this is where our dev JS scripts are
   return (
     gulp
-      .src("./src/js/script.js")
+      .src(["./src/js/_include/**/*.js", "./src/js/scripts/**/*.js"])
       //prevent pipe breaking caused by errors from gulp plugins
       .pipe(plumber())
       .pipe(
@@ -82,15 +83,16 @@ function scripts() {
   );
 }
 
+//open browser and watch for changes
 function watch() {
   browserSync.init({
     server: {
       baseDir: "./",
     },
   });
-  gulp.watch("./src/scss/**/*.scss", styles).on("change", styles);
+  gulp.watch("./src/styles/**/*.*", styles).on("change", styles);
   gulp.watch("./*html").on("change", browserSync.reload);
-  gulp.watch("./src/js/**/*.js").on("change", browserSync.reload);
+  gulp.watch("./src/js/**/*.js").on("change", scripts);
 }
 
 exports.build = gulp.series([styles, scripts]);
