@@ -3,24 +3,83 @@ const sass = require("gulp-sass");
 const browserSync = require("browser-sync").create();
 const postcss = require("gulp-postcss");
 const options = require("./package.json").options;
-var tailwindcss = require("tailwindcss");
+const tailwindcss = require("tailwindcss");
+const cleanCSS = require("gulp-clean-css");
+const merge = require("merge-stream");
+const concat = require("gulp-concat");
+const webpack = require("webpack-stream");
+const plumber = require("gulp-plumber");
+const gutil = require("gulp-util");
 
-//compile scss to css
-function style() {
-  return gulp
-    .src("./scss/**/*.scss")
+//all style file compile in one file
+function styles() {
+  //compile sass file to css and concat all in one file
+  var sassStream = gulp
+    .src("./src/styles/scss/**/*.scss")
     .pipe(sass().on("error", sass.logError))
-    .pipe(gulp.dest("./css"))
-    .pipe(browserSync.stream());
-}
-//compile tailwind css
-function css() {
-  return gulp
-    .src("./scss/tailwind.css")
+    .pipe(concat("scss-files.css"));
+  //compile all css file to one file
+  var cssStream = gulp
+    .src("./src/styles/css/**/*.css")
+    .pipe(concat("css-files.css"));
+  //compile tailwind using tailwind config
+  var tailwindStream = gulp
+    .src("./src/styles/tailwind/tailwind.css")
     .pipe(
       postcss([tailwindcss(options.config.tailwindjs), require("autoprefixer")])
-    )
-    .pipe(gulp.dest("./css"));
+    );
+  //merge all three files in one file
+  return (mergedStream = merge(sassStream, cssStream, tailwindStream)
+    .pipe(concat("styles.css"))
+    .pipe(cleanCSS({ compatibility: "ie8" }))
+    .pipe(gulp.dest("./dist/")));
+}
+
+//compiling our Javascripts
+function scripts() {
+  //this is where our dev JS scripts are
+  return (
+    gulp
+      .src("./src/js/script.js")
+      //prevent pipe breaking caused by errors from gulp plugins
+      .pipe(plumber())
+      .pipe(
+        webpack({
+          watch: false,
+          mode: "development",
+          module: {
+            rules: [
+              {
+                test: /\.(js)$/,
+                exclude: /node_modules/,
+                use: {
+                  loader: "babel-loader",
+                  options: {
+                    presets: [
+                      [
+                        "@babel/preset-env",
+                        {
+                          targets: "> 0.25%, not dead",
+                          useBuiltIns: "usage",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        })
+      )
+      //this is the filename of the compressed version of our JS
+      .pipe(concat("app.js"))
+      //catch errors
+      .on("error", gutil.log)
+      //where we will store our finalized, compressed script
+      .pipe(gulp.dest("dist/"))
+      //notify browserSync to refresh
+      .pipe(browserSync.reload({ stream: true }))
+  );
 }
 
 function watch() {
@@ -29,10 +88,10 @@ function watch() {
       baseDir: "./",
     },
   });
-  gulp.watch("./scss/**/*.scss", style);
+  gulp.watch("./src/scss/**/*.scss", styles).on("change", styles);
   gulp.watch("./*html").on("change", browserSync.reload);
-  gulp.watch("./scss/**/*.js").on("change", browserSync.reload);
+  gulp.watch("./src/js/**/*.js").on("change", browserSync.reload);
 }
 
-exports.build = gulp.series([style, css]);
+exports.build = gulp.series([styles, scripts]);
 exports.watch = watch;
